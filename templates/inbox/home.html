@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TickTick Inbox</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 1000px; margin: 2rem auto; padding: 0 1rem; }
+    a.btn { display: inline-block; background: #2563eb; color: white; padding: .5rem .8rem; border-radius: 6px; text-decoration: none; }
+    a.btn.secondary { background: #6b7280; }
+    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+    th, td { border: 1px solid #e5e7eb; padding: .5rem; text-align: left; }
+    th { background: #f3f4f6; }
+    .muted { color: #6b7280; }
+    .error { color: #b91c1c; }
+  </style>
+</head>
+<body>
+  <h1>TickTick Inbox</h1>
+
+  {% if not connected %}
+    <p class="muted">Connect TickTick to load your inbox tasks.</p>
+    <a class="btn" href="{% url 'oauth_login' %}">Connect TickTick</a>
+  {% else %}
+    <p><a class="btn secondary" href="{% url 'disconnect' %}">Disconnect</a></p>
+    {% if inbox_id %}<p><strong>Inbox ID:</strong> {{ inbox_id }}</p>{% endif %}
+    {% if error %}
+      <p class="error">{{ error }}</p>
+    {% else %}
+      <p>Total tasks: {{ tasks|length }}</p>
+      <table>
+        <thead>
+          <tr>
+            <th>Title</th>
+            <th>Tags</th>
+            <th>Created</th>
+            <th>Due</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for task in tasks %}
+            <tr>
+              <td>{{ task.title }}</td>
+              <td>{{ task.tags|join:", " }}</td>
+              <td>{{ task.created_time }}</td>
+              <td>{{ task.due_date }}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="4">No tasks found.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% endif %}
+  {% endif %}
+</body>
+</html>
