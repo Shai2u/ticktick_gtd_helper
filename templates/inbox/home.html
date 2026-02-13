@@ -13,6 +13,8 @@
     th { background: #f3f4f6; }
     .muted { color: #6b7280; }
     .error { color: #b91c1c; }
+    .debug { margin-top: 1rem; padding: .75rem; border: 1px solid #e5e7eb; background: #f9fafb; }
+    .debug ul { margin: .5rem 0 0 1rem; }
   </style>
 </head>
 <body>
@@ -28,6 +30,17 @@
       <p class="error">{{ error }}</p>
     {% else %}
       <p>Total tasks: {{ tasks|length }}</p>
+      {% if debug %}
+        <div class="debug">
+          <strong>Debug</strong>
+          <ul>
+            <li>Projects found: {{ debug.projects_count }}</li>
+            <li>Task endpoint count: {{ debug.source_task_endpoint_count }}</li>
+            <li>Project data count: {{ debug.source_project_data_count }}</li>
+            <li>Merged count: {{ debug.merged_count }}</li>
+          </ul>
+        </div>
+      {% endif %}
       <table>
         <thead>
           <tr>

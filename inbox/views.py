@@ -23,7 +23,7 @@ def home(request: HttpRequest) -> HttpResponse:
         return render(request, "inbox/home.html", {"connected": False})
 
     try:
-        inbox_id, tasks = fetch_inbox_listing(token["access_token"])
+        inbox_id, tasks, debug = fetch_inbox_listing(token["access_token"])
         return render(
             request,
             "inbox/home.html",
@@ -31,6 +31,7 @@ def home(request: HttpRequest) -> HttpResponse:
                 "connected": True,
                 "inbox_id": inbox_id,
                 "tasks": tasks,
+                "debug": debug,
                 "error": "",
             },
         )
@@ -41,6 +42,7 @@ def home(request: HttpRequest) -> HttpResponse:
             {
                 "connected": True,
                 "tasks": [],
+                "debug": {},
                 "error": f"TickTick API error: {ex}",
             },
         )
