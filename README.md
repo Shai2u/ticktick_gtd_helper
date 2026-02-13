@@ -15,7 +15,7 @@ Configure [.env](.env) with either key set:
 
 - `TICKTICK_CLIENT_ID` or `TT_CLIENT_ID`
 - `TICKTICK_CLIENT_SECRET` or `TT_CLIENT_SECRET`
-- `TICKTICK_REDIRECT_URI` or `TT_REDIRECT_URI` (example: `http://127.0.0.1:8000/oauth/callback/`)
+- `TICKTICK_REDIRECT_URI` or `TT_REDIRECT_URI` (example: `http://127.0.0.1:8022/oauth/callback/`)
 - `DJANGO_SECRET_KEY`
 - `DEBUG=True`
 
@@ -26,5 +26,5 @@ C:/Users/shai/Documents/personal/personal_projects/ticktick-gtd/.venv/Scripts/py
 C:/Users/shai/Documents/personal/personal_projects/ticktick-gtd/.venv/Scripts/python.exe manage.py runserver
 ```
 
-Open http://127.0.0.1:8000 and click “Connect TickTick”.
+Open http://127.0.0.1:8020 and click “Connect TickTick”.
 

@@ -132,7 +132,9 @@ def list_inbox_tasks(access_token: str, inbox_id: str) -> tuple[list[dict[str, A
         data = api_get("/task", access_token, params={"projectId": inbox_id})
         if isinstance(data, list):
             task_endpoint_tasks = [item for item in data if isinstance(item, dict)]
-            debug["source_task_endpoint_count"] = len(task_endpoint_tasks)
+        elif isinstance(data, dict) and isinstance(data.get("tasks"), list):
+            task_endpoint_tasks = [item for item in data["tasks"] if isinstance(item, dict)]
+        debug["source_task_endpoint_count"] = len(task_endpoint_tasks)
     except TickTickAPIError as ex:
         debug["task_endpoint_error"] = str(ex)
 
@@ -146,6 +148,19 @@ def list_inbox_tasks(access_token: str, inbox_id: str) -> tuple[list[dict[str, A
     merged = _dedupe_tasks(task_endpoint_tasks + project_data_tasks)
     debug["merged_count"] = len(merged)
     return merged, debug
+
+
+def _task_project_id(task: dict[str, Any]) -> str:
+    pid = task.get("projectId") or task.get("project_id") or task.get("project") or ""
+    return str(pid)
+
+
+def _counts_by_project(tasks: list[dict[str, Any]]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for task in tasks:
+        pid = _task_project_id(task)
+        counts[pid] = counts.get(pid, 0) + 1
+    return counts
 
 
 def normalize_task(task: dict[str, Any]) -> dict[str, Any]:
@@ -168,17 +183,70 @@ def fetch_inbox_listing(access_token: str) -> tuple[str, list[dict[str, Any]], d
         all_tasks_payload = api_get("/task", access_token)
         if isinstance(all_tasks_payload, list):
             all_tasks_count = len([t for t in all_tasks_payload if isinstance(t, dict)])
+            all_tasks_items = [t for t in all_tasks_payload if isinstance(t, dict)]
+        elif isinstance(all_tasks_payload, dict) and isinstance(all_tasks_payload.get("tasks"), list):
+            all_tasks_items = [t for t in all_tasks_payload["tasks"] if isinstance(t, dict)]
+            all_tasks_count = len(all_tasks_items)
+        else:
+            all_tasks_items = []
     except TickTickAPIError as ex:
         all_tasks_error = str(ex)
+        all_tasks_items = []
+
+    all_counts = _counts_by_project(all_tasks_items)
+    inbox_in_all_tasks_count = all_counts.get(inbox_id, 0)
+
+    project_name_by_id = {
+        str(p.get("id", "")): str(p.get("name", ""))
+        for p in projects
+    }
+
+    top_projects = sorted(all_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+    all_tasks_top_projects = [
+        {
+            "id": pid,
+            "name": project_name_by_id.get(pid, "(unknown)"),
+            "count": count,
+        }
+        for pid, count in top_projects
+    ]
+
+    sample_tasks = [
+        {
+            "title": str(t.get("title") or t.get("content") or "(untitled)"),
+            "project_id": _task_project_id(t),
+        }
+        for t in all_tasks_items[:5]
+    ]
+
+    diagnosis = ""
+    merged_count = int(task_debug.get("merged_count", 0))
+    if merged_count == 0:
+        if all_tasks_count and all_tasks_count > 0:
+            diagnosis = "API is connected, but Inbox appears empty. Your tasks are likely in other lists/projects."
+        elif all_tasks_count == 0:
+            diagnosis = "API is connected, but no tasks were returned at all for this token/account."
+
+    project_list = [
+        {
+            "id": str(p.get("id", "")),
+            "name": str(p.get("name", "")),
+            "group_id": str(p.get("groupId", "")),
+            "parent_id": str(p.get("parentId", "")),
+        }
+        for p in projects
+    ]
 
     debug = {
         "projects_count": len(projects),
-        "project_list": [
-            {"id": str(p.get("id", "")), "name": str(p.get("name", ""))}
-            for p in projects
-        ],
+        "project_list": project_list[:20],
+        "project_list_truncated": len(project_list) > 20,
         "all_tasks_count": all_tasks_count,
+        "inbox_in_all_tasks_count": inbox_in_all_tasks_count,
         "all_tasks_error": all_tasks_error,
+        "all_tasks_top_projects": all_tasks_top_projects,
+        "all_tasks_sample": sample_tasks,
+        "diagnosis": diagnosis,
         **task_debug,
     }
     tasks = [normalize_task(t) for t in raw_tasks]

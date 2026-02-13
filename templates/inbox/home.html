@@ -39,15 +39,34 @@
             <li>Project data count: {{ debug.source_project_data_count }}</li>
             <li>Merged count: {{ debug.merged_count }}</li>
             <li>All tasks count (no project filter): {{ debug.all_tasks_count }}</li>
+            <li>Inbox tasks found in all-task scan: {{ debug.inbox_in_all_tasks_count }}</li>
+            {% if debug.diagnosis %}<li><strong>{{ debug.diagnosis }}</strong></li>{% endif %}
             {% if debug.task_endpoint_error %}<li>Task endpoint error: {{ debug.task_endpoint_error }}</li>{% endif %}
             {% if debug.project_data_error %}<li>Project data error: {{ debug.project_data_error }}</li>{% endif %}
             {% if debug.all_tasks_error %}<li>All tasks error: {{ debug.all_tasks_error }}</li>{% endif %}
           </ul>
           {% if debug.project_list %}
-            <p><strong>Projects</strong></p>
+            <p><strong>Projects (first 20)</strong></p>
             <ul>
               {% for p in debug.project_list %}
-                <li>{{ p.name }} ({{ p.id }})</li>
+                <li>{{ p.name }} (id={{ p.id }}, groupId={{ p.group_id|default:"-" }}, parentId={{ p.parent_id|default:"-" }})</li>
+              {% endfor %}
+            </ul>
+            {% if debug.project_list_truncated %}<p class="muted">Project list truncated to first 20.</p>{% endif %}
+          {% endif %}
+          {% if debug.all_tasks_top_projects %}
+            <p><strong>Top projects by task count (from all tasks)</strong></p>
+            <ul>
+              {% for p in debug.all_tasks_top_projects %}
+                <li>{{ p.name }} ({{ p.id }}): {{ p.count }}</li>
+              {% endfor %}
+            </ul>
+          {% endif %}
+          {% if debug.all_tasks_sample %}
+            <p><strong>Sample tasks (first 5 from all tasks)</strong></p>
+            <ul>
+              {% for t in debug.all_tasks_sample %}
+                <li>{{ t.title }} — projectId={{ t.project_id }}</li>
               {% endfor %}
             </ul>
           {% endif %}
