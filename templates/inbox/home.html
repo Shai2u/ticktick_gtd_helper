@@ -38,7 +38,19 @@
             <li>Task endpoint count: {{ debug.source_task_endpoint_count }}</li>
             <li>Project data count: {{ debug.source_project_data_count }}</li>
             <li>Merged count: {{ debug.merged_count }}</li>
+            <li>All tasks count (no project filter): {{ debug.all_tasks_count }}</li>
+            {% if debug.task_endpoint_error %}<li>Task endpoint error: {{ debug.task_endpoint_error }}</li>{% endif %}
+            {% if debug.project_data_error %}<li>Project data error: {{ debug.project_data_error }}</li>{% endif %}
+            {% if debug.all_tasks_error %}<li>All tasks error: {{ debug.all_tasks_error }}</li>{% endif %}
           </ul>
+          {% if debug.project_list %}
+            <p><strong>Projects</strong></p>
+            <ul>
+              {% for p in debug.project_list %}
+                <li>{{ p.name }} ({{ p.id }})</li>
+              {% endfor %}
+            </ul>
+          {% endif %}
         </div>
       {% endif %}
       <table>

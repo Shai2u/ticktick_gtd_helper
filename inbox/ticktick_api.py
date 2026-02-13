@@ -161,9 +161,24 @@ def fetch_inbox_listing(access_token: str) -> tuple[str, list[dict[str, Any]], d
     projects = list_projects(access_token)
     inbox_id = find_inbox_id(projects)
     raw_tasks, task_debug = list_inbox_tasks(access_token, inbox_id)
+
+    all_tasks_count = None
+    all_tasks_error = ""
+    try:
+        all_tasks_payload = api_get("/task", access_token)
+        if isinstance(all_tasks_payload, list):
+            all_tasks_count = len([t for t in all_tasks_payload if isinstance(t, dict)])
+    except TickTickAPIError as ex:
+        all_tasks_error = str(ex)
+
     debug = {
         "projects_count": len(projects),
-        "project_names": [str(p.get("name", "")) for p in projects],
+        "project_list": [
+            {"id": str(p.get("id", "")), "name": str(p.get("name", ""))}
+            for p in projects
+        ],
+        "all_tasks_count": all_tasks_count,
+        "all_tasks_error": all_tasks_error,
         **task_debug,
     }
     tasks = [normalize_task(t) for t in raw_tasks]
