@@ -96,18 +96,56 @@ def find_inbox_id(projects: list[dict[str, Any]]) -> str:
     raise TickTickAPIError("Inbox not found")
 
 
-def list_inbox_tasks(access_token: str, inbox_id: str) -> list[dict[str, Any]]:
+def _extract_tasks_from_project_data(payload: Any) -> list[dict[str, Any]]:
+    if not isinstance(payload, dict):
+        return []
+    for key in ("tasks", "task"):
+        value = payload.get(key)
+        if isinstance(value, list):
+            return [item for item in value if isinstance(item, dict)]
+    return []
+
+
+def _dedupe_tasks(tasks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    seen: set[str] = set()
+    result: list[dict[str, Any]] = []
+    for task in tasks:
+        task_id = str(task.get("id", ""))
+        if task_id and task_id in seen:
+            continue
+        if task_id:
+            seen.add(task_id)
+        result.append(task)
+    return result
+
+
+def list_inbox_tasks(access_token: str, inbox_id: str) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    debug: dict[str, Any] = {
+        "source_task_endpoint_count": 0,
+        "source_project_data_count": 0,
+    }
+
+    task_endpoint_tasks: list[dict[str, Any]] = []
+    project_data_tasks: list[dict[str, Any]] = []
+
     try:
         data = api_get("/task", access_token, params={"projectId": inbox_id})
         if isinstance(data, list):
-            return data
-    except TickTickAPIError:
-        pass
+            task_endpoint_tasks = [item for item in data if isinstance(item, dict)]
+            debug["source_task_endpoint_count"] = len(task_endpoint_tasks)
+    except TickTickAPIError as ex:
+        debug["task_endpoint_error"] = str(ex)
 
-    project_data = api_get(f"/project/{inbox_id}/data", access_token)
-    if isinstance(project_data, dict) and isinstance(project_data.get("tasks"), list):
-        return project_data["tasks"]
-    return []
+    try:
+        project_data = api_get(f"/project/{inbox_id}/data", access_token)
+        project_data_tasks = _extract_tasks_from_project_data(project_data)
+        debug["source_project_data_count"] = len(project_data_tasks)
+    except TickTickAPIError as ex:
+        debug["project_data_error"] = str(ex)
+
+    merged = _dedupe_tasks(task_endpoint_tasks + project_data_tasks)
+    debug["merged_count"] = len(merged)
+    return merged, debug
 
 
 def normalize_task(task: dict[str, Any]) -> dict[str, Any]:
@@ -119,8 +157,14 @@ def normalize_task(task: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def fetch_inbox_listing(access_token: str) -> tuple[str, list[dict[str, Any]]]:
+def fetch_inbox_listing(access_token: str) -> tuple[str, list[dict[str, Any]], dict[str, Any]]:
     projects = list_projects(access_token)
     inbox_id = find_inbox_id(projects)
-    tasks = [normalize_task(t) for t in list_inbox_tasks(access_token, inbox_id)]
-    return inbox_id, tasks
+    raw_tasks, task_debug = list_inbox_tasks(access_token, inbox_id)
+    debug = {
+        "projects_count": len(projects),
+        "project_names": [str(p.get("name", "")) for p in projects],
+        **task_debug,
+    }
+    tasks = [normalize_task(t) for t in raw_tasks]
+    return inbox_id, tasks, debug
