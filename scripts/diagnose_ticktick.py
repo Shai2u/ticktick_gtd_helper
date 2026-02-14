@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import argparse
 import os
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -9,6 +11,8 @@ import requests
 
 def _setup_django() -> None:
     project_root = Path(__file__).resolve().parents[1]
+    if str(project_root) not in sys.path:
+        sys.path.insert(0, str(project_root))
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "ticktick_gtd.settings")
     os.chdir(project_root)
     import django
@@ -58,7 +62,52 @@ def _tasks_from_payload(payload: Any) -> list[dict[str, Any]]:
     return []
 
 
+def _task_title(task: dict[str, Any]) -> str:
+    return str(task.get("title") or task.get("content") or "").strip()
+
+
+def _find_title_in_all_projects(token: str, projects: list[dict[str, Any]], needle: str) -> list[dict[str, str]]:
+    needle_norm = needle.strip().lower()
+    matches: list[dict[str, str]] = []
+
+    for idx, project in enumerate(projects, start=1):
+        pid = str(project.get("id", ""))
+        pname = str(project.get("name", ""))
+        if not pid:
+            continue
+
+        resp = _api_get(f"/project/{pid}/data", token)
+        if not resp["ok"]:
+            continue
+
+        tasks = _tasks_from_payload(resp["json"])
+        for task in tasks:
+            title = _task_title(task)
+            if needle_norm and needle_norm in title.lower():
+                matches.append(
+                    {
+                        "project_id": pid,
+                        "project_name": pname,
+                        "task_title": title,
+                        "task_id": str(task.get("id", "")),
+                    }
+                )
+
+        if idx % 100 == 0:
+            print(f"Scanned {idx}/{len(projects)} projects...")
+
+    return matches
+
+
 def main() -> None:
+    parser = argparse.ArgumentParser(description="Diagnose TickTick inbox and search tasks across projects")
+    parser.add_argument(
+        "--title",
+        default="",
+        help="Optional task title (or substring) to search in all projects",
+    )
+    args = parser.parse_args()
+
     _setup_django()
 
     token = _find_latest_token()
@@ -122,6 +171,15 @@ def main() -> None:
         )
     else:
         print("No inbox tasks found by any endpoint.")
+
+    if args.title:
+        print(f"\nSearching all projects for title containing: {args.title!r}")
+        matches = _find_title_in_all_projects(access_token, projects, args.title)
+        print(f"Matches found: {len(matches)}")
+        for match in matches[:20]:
+            print(
+                f"- {match['task_title']} | project={match['project_name']} ({match['project_id']}) | task={match['task_id']}"
+            )
 
 
 if __name__ == "__main__":
