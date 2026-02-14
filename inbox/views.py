@@ -49,18 +49,27 @@ def home(request: HttpRequest) -> HttpResponse:
 
 
 def oauth_login(request: HttpRequest) -> HttpResponse:
+    # Start from a clean OAuth session to avoid stale state mismatches.
+    request.session.pop(SESSION_STATE_KEY, None)
+    request.session.pop(SESSION_TOKEN_KEY, None)
+    request.session.cycle_key()
+
     state = secrets.token_urlsafe(24)
     request.session[SESSION_STATE_KEY] = state
+    request.session.modified = True
     return redirect(build_authorize_url(state))
 
 
 def oauth_callback(request: HttpRequest) -> HttpResponse:
-    expected_state = request.session.get(SESSION_STATE_KEY)
+    expected_state = request.session.pop(SESSION_STATE_KEY, None)
     got_state = request.GET.get("state")
     code = request.GET.get("code")
 
     if not expected_state or expected_state != got_state:
-        return HttpResponse("Invalid OAuth state", status=400)
+        return HttpResponse(
+            "Invalid OAuth state. Open http://127.0.0.1:8022/, click Connect TickTick once, and complete login in the same tab.",
+            status=400,
+        )
     if not code:
         return HttpResponse("Missing OAuth code", status=400)
 

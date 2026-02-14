@@ -10,6 +10,7 @@ from typing import Any
 
 from dotenv import load_dotenv
 import requests
+from tqdm import tqdm
 
 
 def load_env() -> None:
@@ -137,7 +138,7 @@ def openapi_get(token: str, path: str) -> requests.Response:
     return requests.get(url, headers=headers, timeout=30)
 
 
-def run_oauth_mode(title: str, oauth_token: str) -> None:
+def run_oauth_mode(title: str, oauth_token: str, max_projects: int = 0) -> None:
     print("Using OAuth token mode (OpenAPI)")
 
     projects_resp = openapi_get(oauth_token, "/project")
@@ -154,7 +155,9 @@ def run_oauth_mode(title: str, oauth_token: str) -> None:
 
     tasks: list[dict[str, Any]] = []
     seen: set[str] = set()
-    for p in projects:
+    projects_to_scan = projects[:max_projects] if max_projects and max_projects > 0 else projects
+
+    for p in tqdm(projects_to_scan, desc="OAuth scan", unit="project"):
         pid = str(get_value(p, "id", default="")).strip()
         if not pid:
             continue
@@ -174,6 +177,7 @@ def run_oauth_mode(title: str, oauth_token: str) -> None:
             tasks.append(t)
 
     print("\n=== RESULT 1: TOTAL TASK COUNT ===")
+    print(f"Projects scanned: {len(projects_to_scan)} / {len(projects)}")
     print(f"Total tasks returned in OAuth mode: {len(tasks)}")
 
     print("\n=== RESULT 2: INBOX CANDIDATES ===")
@@ -208,6 +212,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Probe TickTick via pyticktick (unofficial flow).")
     parser.add_argument("--oauth-token", default="", help="Use OAuth access token directly (OpenAPI mode).")
     parser.add_argument("--oauth-from-django-session", action="store_true", help="Load OAuth token from Django session.")
+    parser.add_argument("--max-projects", type=int, default=0, help="In OAuth mode, scan only first N projects (0 means all).")
     parser.add_argument("--username", default="", help="TickTick username/email")
     parser.add_argument("--password", default="", help="TickTick password")
     parser.add_argument("--title", default="Focus Hazafa to balance", help="Task title substring to search.")
@@ -225,7 +230,7 @@ def main() -> None:
         oauth_token = oauth_token_from_django_session()
 
     if oauth_token:
-        run_oauth_mode(args.title, oauth_token)
+        run_oauth_mode(args.title, oauth_token, max_projects=args.max_projects)
         return
 
     username = args.username or os.getenv("TICKTICK_USER") or os.getenv("TT_USER") or ""
