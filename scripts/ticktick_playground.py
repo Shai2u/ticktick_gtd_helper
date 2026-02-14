@@ -105,12 +105,14 @@ def main() -> None:
     load_env()
 
     token = args.token or os.getenv("TICKTICK_ACCESS_TOKEN") or os.getenv("TT_ACCESS_TOKEN")
-    if not token and args.from_django_session:
+    # Always try Django session fallback if env/arg token is missing.
+    # The flag is still accepted, but fallback is enabled by default to simplify debugging.
+    if not token:
         token = token_from_django_session()
 
     if not token:
         raise SystemExit(
-            "Missing access token. Pass --token, set TICKTICK_ACCESS_TOKEN, or use --from-django-session."
+            "Missing access token. Reconnect once in the Django app so a session token exists, or pass --token / set TICKTICK_ACCESS_TOKEN."
         )
 
     params = parse_params(args.param)
