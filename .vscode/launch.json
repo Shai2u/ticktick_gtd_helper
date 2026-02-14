@@ -43,6 +43,19 @@
       ]
     },
     {
+      "name": "TickTick Playground: All tasks (aggregated)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/scripts/ticktick_playground.py",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
+      "args": [
+        "/all-tasks",
+        "--from-django-session"
+      ]
+    },
+    {
       "name": "TickTick Playground: Custom endpoint",
       "type": "debugpy",
       "request": "launch",
@@ -52,6 +65,33 @@
       "envFile": "${workspaceFolder}/.env",
       "args": [
         "/task",
+        "--from-django-session"
+      ]
+    },
+    {
+      "name": "TickTick Playground: Tasks with no projectId",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/scripts/ticktick_playground.py",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
+      "args": [
+        "/project/659b98208f0806acbf9f814e/data",
+        "--from-django-session",
+        "--only-no-project"
+      ]
+    },
+        {
+      "name": "TickTick Playground: Inbox",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/scripts/ticktick_playground.py",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
+      "args": [
+        "/inbox",
         "--from-django-session"
       ]
     }

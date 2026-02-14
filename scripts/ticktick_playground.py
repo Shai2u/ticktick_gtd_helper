@@ -9,6 +9,7 @@ from typing import Any
 
 import requests
 from dotenv import load_dotenv
+from tqdm import tqdm
 
 BASE_URL = "https://api.ticktick.com/open/v1"
 
@@ -75,13 +76,72 @@ def print_response(resp: requests.Response) -> None:
         print(resp.text)
 
 
+def extract_tasks(payload: Any) -> list[dict[str, Any]]:
+    if isinstance(payload, list):
+        return [item for item in payload if isinstance(item, dict)]
+    if isinstance(payload, dict):
+        for key in ("tasks", "task"):
+            value = payload.get(key)
+            if isinstance(value, list):
+                return [item for item in value if isinstance(item, dict)]
+    return []
+
+
+def has_no_project(task: dict[str, Any]) -> bool:
+    value = task.get("projectId")
+    return value in (None, "")
+
+
+def list_projects(token: str) -> list[dict[str, Any]]:
+    resp = api_get(token=token, path="/project")
+    if not resp.ok:
+        raise SystemExit(f"Failed to list projects: {resp.status_code} {resp.text}")
+
+    payload: Any = resp.json() if resp.text else None
+    if isinstance(payload, list):
+        return [item for item in payload if isinstance(item, dict)]
+    if isinstance(payload, dict) and isinstance(payload.get("projects"), list):
+        return [item for item in payload["projects"] if isinstance(item, dict)]
+    return []
+
+
+def list_all_tasks_via_projects(token: str) -> list[dict[str, Any]]:
+    projects = list_projects(token)
+    all_tasks: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+
+    for project in tqdm(projects, desc="Scanning projects", unit="project"):
+        project_id = str(project.get("id", "")).strip()
+        if not project_id:
+            continue
+
+        resp = api_get(token=token, path=f"/project/{project_id}/data")
+        if not resp.ok:
+            continue
+
+        payload: Any = resp.json() if resp.text else None
+        tasks = extract_tasks(payload)
+        for task in tasks:
+            if "projectId" not in task or task.get("projectId") in (None, ""):
+                task["projectId"] = project_id
+
+            tid = str(task.get("id", "")).strip()
+            if tid and tid in seen_ids:
+                continue
+            if tid:
+                seen_ids.add(tid)
+            all_tasks.append(task)
+
+    return all_tasks
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Simple TickTick OpenAPI playground (GET only)."
     )
     parser.add_argument(
         "path",
-        help="API path under /open/v1, e.g. /project or /task or /project/<id>/data",
+        help="API path under /open/v1 (e.g. /project, /task, /project/<id>/data) or /all-tasks (aggregated mode)",
     )
     parser.add_argument(
         "--param",
@@ -98,6 +158,16 @@ def main() -> None:
         "--from-django-session",
         action="store_true",
         help="If no token is provided, try reading the latest OAuth token from Django sessions.",
+    )
+    parser.add_argument(
+        "--only-no-project",
+        action="store_true",
+        help="When response contains tasks, keep only tasks with empty/missing projectId.",
+    )
+    parser.add_argument(
+        "--only-inbox-heuristic",
+        action="store_true",
+        help="When response contains tasks, keep tasks with empty/missing projectId OR projectId starting with 'inbox'.",
     )
 
     args = parser.parse_args()
@@ -116,7 +186,64 @@ def main() -> None:
         )
 
     params = parse_params(args.param)
+
+    if args.path.strip().lower() in {"/all-tasks", "all-tasks"}:
+        tasks = list_all_tasks_via_projects(token)
+        print("status: 200")
+        print("ok: True")
+        print("url: aggregated:/project/*/data")
+        print("-" * 60)
+
+        if args.only_no_project:
+            filtered = [t for t in tasks if has_no_project(t)]
+            print(f"tasks total: {len(tasks)}")
+            print(f"tasks filtered: {len(filtered)}")
+            print(json.dumps(filtered, indent=2, ensure_ascii=False))
+            return
+
+        if args.only_inbox_heuristic:
+            filtered = [
+                t
+                for t in tasks
+                if has_no_project(t) or str(t.get("projectId", "")).startswith("inbox")
+            ]
+            print(f"tasks total: {len(tasks)}")
+            print(f"tasks filtered: {len(filtered)}")
+            print(json.dumps(filtered, indent=2, ensure_ascii=False))
+            return
+
+        print(f"tasks total: {len(tasks)}")
+        print(json.dumps(tasks, indent=2, ensure_ascii=False))
+        return
+
     resp = api_get(token=token, path=args.path, params=params)
+
+    try:
+        payload: Any = resp.json() if resp.text else None
+    except ValueError:
+        payload = None
+
+    if (args.only_no_project or args.only_inbox_heuristic) and payload is not None:
+        tasks = extract_tasks(payload)
+        if tasks:
+            if args.only_no_project:
+                filtered = [t for t in tasks if has_no_project(t)]
+            else:
+                filtered = [
+                    t
+                    for t in tasks
+                    if has_no_project(t) or str(t.get("projectId", "")).startswith("inbox")
+                ]
+
+            print(f"status: {resp.status_code}")
+            print(f"ok: {resp.ok}")
+            print(f"url: {resp.url}")
+            print("-" * 60)
+            print(f"tasks total: {len(tasks)}")
+            print(f"tasks filtered: {len(filtered)}")
+            print(json.dumps(filtered, indent=2, ensure_ascii=False))
+            return
+
     print_response(resp)
 
 
