@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import getpass
 import json
 import os
 from pathlib import Path
@@ -107,17 +108,24 @@ def task_title(task: dict[str, Any]) -> str:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Probe TickTick via pyticktick (unofficial flow).")
+    parser.add_argument("--username", default="", help="TickTick username/email")
+    parser.add_argument("--password", default="", help="TickTick password")
     parser.add_argument("--title", default="Focus Hazafa to balance", help="Task title substring to search.")
     parser.add_argument("--dump-json", default="", help="Optional path to dump raw batch JSON.")
     args = parser.parse_args()
 
     load_env()
 
-    username = os.getenv("TICKTICK_USER") or os.getenv("TT_USER") or ""
-    password = os.getenv("TICKTICK_PASS") or os.getenv("TT_PASS") or ""
+    username = args.username or os.getenv("TICKTICK_USER") or os.getenv("TT_USER") or ""
+    password = args.password or os.getenv("TICKTICK_PASS") or os.getenv("TT_PASS") or ""
 
-    if not username or not password or password == "your_password":
-        raise SystemExit("Missing real TickTick credentials in .env. Set TICKTICK_USER and TICKTICK_PASS.")
+    if not username:
+        username = input("TickTick username/email: ").strip()
+    if not password or password == "your_password":
+        password = getpass.getpass("TickTick password: ").strip()
+
+    if not username or not password:
+        raise SystemExit("Missing credentials. Pass --username/--password or set TICKTICK_USER and TICKTICK_PASS.")
 
     from pyticktick import Client
 
