@@ -3,11 +3,39 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
+from pathlib import Path
 from typing import Any
 
 import requests
+from dotenv import load_dotenv
 
 BASE_URL = "https://api.ticktick.com/open/v1"
+
+
+def load_env() -> None:
+    root = Path(__file__).resolve().parents[1]
+    load_dotenv(root / ".env")
+
+
+def token_from_django_session() -> str:
+    root = Path(__file__).resolve().parents[1]
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "ticktick_gtd.settings")
+
+    import django
+
+    django.setup()
+
+    from django.contrib.sessions.models import Session
+
+    for session in Session.objects.order_by("-expire_date"):
+        data = session.get_decoded()
+        token = data.get("ticktick_oauth_token")
+        if isinstance(token, dict) and token.get("access_token"):
+            return str(token["access_token"])
+    return ""
 
 
 def parse_params(values: list[str]) -> dict[str, str]:
@@ -66,13 +94,23 @@ def main() -> None:
         default="",
         help="Access token. If omitted, reads TICKTICK_ACCESS_TOKEN or TT_ACCESS_TOKEN from env.",
     )
+    parser.add_argument(
+        "--from-django-session",
+        action="store_true",
+        help="If no token is provided, try reading the latest OAuth token from Django sessions.",
+    )
 
     args = parser.parse_args()
 
+    load_env()
+
     token = args.token or os.getenv("TICKTICK_ACCESS_TOKEN") or os.getenv("TT_ACCESS_TOKEN")
+    if not token and args.from_django_session:
+        token = token_from_django_session()
+
     if not token:
         raise SystemExit(
-            "Missing access token. Pass --token or set TICKTICK_ACCESS_TOKEN in environment."
+            "Missing access token. Pass --token, set TICKTICK_ACCESS_TOKEN, or use --from-django-session."
         )
 
     params = parse_params(args.param)
