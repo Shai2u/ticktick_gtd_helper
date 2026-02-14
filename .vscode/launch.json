@@ -79,6 +79,7 @@
       "cwd": "${workspaceFolder}",
       "envFile": "${workspaceFolder}/.env",
       "args": [
+        "--oauth-from-django-session",
         "--title",
         "Focus Hazafa to balance"
       ]
