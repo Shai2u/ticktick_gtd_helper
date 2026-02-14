@@ -71,6 +71,19 @@
       ]
     },
     {
+      "name": "TickTick Probe: pyticktick (3 checks)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/scripts/probe_pyticktick.py",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
+      "args": [
+        "--title",
+        "Focus Hazafa to balance"
+      ]
+    },
+    {
       "name": "TickTick Playground: Custom endpoint",
       "type": "debugpy",
       "request": "launch",
