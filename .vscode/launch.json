@@ -10,7 +10,8 @@
       "cwd": "${workspaceFolder}",
       "envFile": "${workspaceFolder}/.env",
       "args": [
-        "/project"
+        "/project",
+        "--from-django-session"
       ]
     },
     {
@@ -24,7 +25,8 @@
       "args": [
         "/task",
         "--param",
-        "projectId=659b98208f0806acbf9f814e"
+        "projectId=659b98208f0806acbf9f814e",
+        "--from-django-session"
       ]
     },
     {
@@ -36,7 +38,8 @@
       "cwd": "${workspaceFolder}",
       "envFile": "${workspaceFolder}/.env",
       "args": [
-        "/project/659b98208f0806acbf9f814e/data"
+        "/project/659b98208f0806acbf9f814e/data",
+        "--from-django-session"
       ]
     },
     {
@@ -48,7 +51,8 @@
       "cwd": "${workspaceFolder}",
       "envFile": "${workspaceFolder}/.env",
       "args": [
-        "/task"
+        "/task",
+        "--from-django-session"
       ]
     }
   ]
