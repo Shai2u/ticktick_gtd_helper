@@ -9,9 +9,28 @@ from typing import Any
 
 import requests
 from dotenv import load_dotenv
+from openpyxl import Workbook
 from tqdm import tqdm
 
 BASE_URL = "https://api.ticktick.com/open/v1"
+
+EXPORT_COLUMNS = [
+    "tags",
+    "title",
+    "content",
+    "desc",
+    "id",
+    "projectId",
+    "status",
+    # Useful extras
+    "parentId",
+    "priority",
+    "createdTime",
+    "startDate",
+    "dueDate",
+    "completedTime",
+    "modifiedTime",
+]
 
 
 def load_env() -> None:
@@ -92,6 +111,56 @@ def has_no_project(task: dict[str, Any]) -> bool:
     return value in (None, "")
 
 
+def has_no_parent(task: dict[str, Any]) -> bool:
+    value = task.get("parentId")
+    return value in (None, "")
+
+
+def apply_task_filters(
+    tasks: list[dict[str, Any]],
+    only_no_project: bool,
+    only_inbox_heuristic: bool,
+    only_no_parent: bool,
+) -> list[dict[str, Any]]:
+    filtered = tasks
+
+    if only_no_project:
+        filtered = [t for t in filtered if has_no_project(t)]
+
+    if only_inbox_heuristic:
+        filtered = [
+            t
+            for t in filtered
+            if has_no_project(t) or str(t.get("projectId", "")).startswith("inbox")
+        ]
+
+    if only_no_parent:
+        filtered = [t for t in filtered if has_no_parent(t)]
+
+    return filtered
+
+
+def export_tasks_to_excel(tasks: list[dict[str, Any]], output_path: Path) -> None:
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "tasks"
+
+    ws.append(EXPORT_COLUMNS)
+    for task in tasks:
+        row: list[Any] = []
+        for col in EXPORT_COLUMNS:
+            value = task.get(col)
+            if col == "tags" and isinstance(value, list):
+                value = ", ".join(str(v) for v in value)
+            elif isinstance(value, (dict, list)):
+                value = json.dumps(value, ensure_ascii=False)
+            row.append(value)
+        ws.append(row)
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    wb.save(output_path)
+
+
 def list_projects(token: str) -> list[dict[str, Any]]:
     resp = api_get(token=token, path="/project")
     if not resp.ok:
@@ -169,6 +238,16 @@ def main() -> None:
         action="store_true",
         help="When response contains tasks, keep tasks with empty/missing projectId OR projectId starting with 'inbox'.",
     )
+    parser.add_argument(
+        "--only-no-parent",
+        action="store_true",
+        help="When response contains tasks, keep only tasks with empty/missing parentId.",
+    )
+    parser.add_argument(
+        "--export-xlsx",
+        default="",
+        help="Optional path to export tasks to .xlsx (after filters are applied).",
+    )
 
     args = parser.parse_args()
 
@@ -194,26 +273,23 @@ def main() -> None:
         print("url: aggregated:/project/*/data")
         print("-" * 60)
 
-        if args.only_no_project:
-            filtered = [t for t in tasks if has_no_project(t)]
-            print(f"tasks total: {len(tasks)}")
-            print(f"tasks filtered: {len(filtered)}")
-            print(json.dumps(filtered, indent=2, ensure_ascii=False))
-            return
-
-        if args.only_inbox_heuristic:
-            filtered = [
-                t
-                for t in tasks
-                if has_no_project(t) or str(t.get("projectId", "")).startswith("inbox")
-            ]
-            print(f"tasks total: {len(tasks)}")
-            print(f"tasks filtered: {len(filtered)}")
-            print(json.dumps(filtered, indent=2, ensure_ascii=False))
-            return
+        filtered = apply_task_filters(
+            tasks,
+            only_no_project=args.only_no_project,
+            only_inbox_heuristic=args.only_inbox_heuristic,
+            only_no_parent=args.only_no_parent,
+        )
 
         print(f"tasks total: {len(tasks)}")
-        print(json.dumps(tasks, indent=2, ensure_ascii=False))
+        print(f"tasks filtered: {len(filtered)}")
+
+        if args.export_xlsx:
+            output = Path(args.export_xlsx).expanduser().resolve()
+            export_tasks_to_excel(filtered, output)
+            print(f"exported: {output}")
+            return
+
+        print(json.dumps(filtered, indent=2, ensure_ascii=False))
         return
 
     resp = api_get(token=token, path=args.path, params=params)
@@ -223,17 +299,15 @@ def main() -> None:
     except ValueError:
         payload = None
 
-    if (args.only_no_project or args.only_inbox_heuristic) and payload is not None:
+    if (args.only_no_project or args.only_inbox_heuristic or args.only_no_parent or args.export_xlsx) and payload is not None:
         tasks = extract_tasks(payload)
         if tasks:
-            if args.only_no_project:
-                filtered = [t for t in tasks if has_no_project(t)]
-            else:
-                filtered = [
-                    t
-                    for t in tasks
-                    if has_no_project(t) or str(t.get("projectId", "")).startswith("inbox")
-                ]
+            filtered = apply_task_filters(
+                tasks,
+                only_no_project=args.only_no_project,
+                only_inbox_heuristic=args.only_inbox_heuristic,
+                only_no_parent=args.only_no_parent,
+            )
 
             print(f"status: {resp.status_code}")
             print(f"ok: {resp.ok}")
@@ -241,6 +315,13 @@ def main() -> None:
             print("-" * 60)
             print(f"tasks total: {len(tasks)}")
             print(f"tasks filtered: {len(filtered)}")
+
+            if args.export_xlsx:
+                output = Path(args.export_xlsx).expanduser().resolve()
+                export_tasks_to_excel(filtered, output)
+                print(f"exported: {output}")
+                return
+
             print(json.dumps(filtered, indent=2, ensure_ascii=False))
             return
 

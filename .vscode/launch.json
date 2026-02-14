@@ -56,6 +56,21 @@
       ]
     },
     {
+      "name": "TickTick Playground: Export all tasks to Excel",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/scripts/ticktick_playground.py",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
+      "args": [
+        "/all-tasks",
+        "--from-django-session",
+        "--export-xlsx",
+        "${workspaceFolder}/exports/ticktick_all_tasks.xlsx"
+      ]
+    },
+    {
       "name": "TickTick Playground: Custom endpoint",
       "type": "debugpy",
       "request": "launch",
